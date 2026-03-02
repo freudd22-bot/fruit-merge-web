@@ -1,21 +1,26 @@
-// -------------------------------
-// حماية الدومين (تعمل مع GitHub Pages و Firebase)
-// -------------------------------
-const allowedHosts = [
-  "freudd22-bot.github.io",   // GitHub Pages
-  "fruit-merge-web.web.app",  // Firebase
-  "fruit-merge-web.firebaseapp.com",
-  "localhost"                 // للتجربة المحلية
-];
+// ===============================
+// حماية ذكية للدومين
+// ===============================
+(function () {
+  const host = window.location.hostname;
 
-if (!allowedHosts.includes(window.location.hostname)) {
-  document.body.innerHTML = "<h2 style='text-align:center;margin-top:50px'>🚫 غير مصرح بتشغيل اللعبة هنا</h2>";
-  throw new Error("Blocked");
-}
+  const allowed =
+    host.includes("github.io") ||
+    host.includes("web.app") ||
+    host.includes("firebaseapp.com") ||
+    host === "localhost" ||
+    host === "127.0.0.1";
 
-// -------------------------------
+  if (!allowed) {
+    document.body.innerHTML =
+      "<h2 style='text-align:center;margin-top:50px'>🚫 غير مصرح بتشغيل اللعبة هنا</h2>";
+    throw new Error("Blocked");
+  }
+})();
+
+// ===============================
 // Firebase Configuration
-// -------------------------------
+// ===============================
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "fruit-merge-web.firebaseapp.com",
@@ -26,55 +31,79 @@ const firebaseConfig = {
   appId: "YOUR_APP_ID"
 };
 
-firebase.initializeApp(firebaseConfig);
+if (typeof firebase !== "undefined") {
+  firebase.initializeApp(firebaseConfig);
+}
 
-// -------------------------------
-// اللعبة
-// -------------------------------
-let grid = [], score = 0, gems = 0, target = "";
+// ===============================
+// إعدادات اللعبة
+// ===============================
+let grid = [];
+let score = 0;
+let gems = 0;
+let target = "";
+
 const size = 6;
 const fruits = ["🍎","🍌","🍊","🍓","🍐","🍇"];
 
-document.getElementById("startBtn").onclick = () => {
-  document.getElementById("gameContainer").style.display = "block";
-  document.getElementById("startBtn").style.display = "none";
-  init();
-  render();
-};
+const startBtn = document.getElementById("startBtn");
+const gameContainer = document.getElementById("gameContainer");
 
-function init(){
+if (startBtn) {
+  startBtn.onclick = () => {
+    gameContainer.style.display = "block";
+    startBtn.style.display = "none";
+    init();
+    render();
+  };
+}
+
+// ===============================
+// بدء اللعبة
+// ===============================
+function init() {
   grid = [];
   score = 0;
   gems = 0;
-  document.getElementById("score").textContent = score;
-  document.getElementById("gems").textContent = gems;
 
-  for(let r=0;r<size;r++){
-    let row=[];
-    for(let c=0;c<size;c++) row.push(randomFruit());
+  updateScore();
+
+  for (let r = 0; r < size; r++) {
+    let row = [];
+    for (let c = 0; c < size; c++) {
+      row.push(randomFruit());
+    }
     grid.push(row);
   }
+
   newTarget();
 }
 
-function newTarget(){
-  target = fruits[Math.floor(Math.random()*fruits.length)];
-  document.getElementById("target").textContent = target;
+function newTarget() {
+  target = fruits[Math.floor(Math.random() * fruits.length)];
+  const targetEl = document.getElementById("target");
+  if (targetEl) targetEl.textContent = target;
 }
 
-function randomFruit(){
-  return fruits[Math.floor(Math.random()*fruits.length)];
+function randomFruit() {
+  return fruits[Math.floor(Math.random() * fruits.length)];
 }
 
-function render(){
+// ===============================
+// رسم الشبكة
+// ===============================
+function render() {
   const game = document.getElementById("game");
+  if (!game) return;
+
   game.innerHTML = "";
-  for(let r=0;r<size;r++){
-    for(let c=0;c<size;c++){
+
+  for (let r = 0; r < size; r++) {
+    for (let c = 0; c < size; c++) {
       const cell = document.createElement("div");
       cell.className = "cell";
       cell.textContent = grid[r][c];
-      cell.onclick = () => clickCell(r,c);
+      cell.onclick = () => clickCell(r, c);
       game.appendChild(cell);
     }
   }
@@ -82,47 +111,67 @@ function render(){
 
 let selected = null;
 
-function clickCell(r,c){
-  if(!selected){
-    selected=[r,c];
+function clickCell(r, c) {
+  if (!selected) {
+    selected = [r, c];
     return;
   }
 
-  const [sr,sc]=selected;
+  const [sr, sc] = selected;
 
-  if(grid[sr][sc]===grid[r][c] && !(sr===r&&sc===c)){
-    grid[sr][sc]=randomFruit();
-    grid[r][c]=randomFruit();
+  if (grid[sr][sc] === grid[r][c] && !(sr === r && sc === c)) {
+    grid[sr][sc] = randomFruit();
+    grid[r][c] = randomFruit();
     checkRows();
   }
 
-  selected=null;
+  selected = null;
   render();
 }
 
-function checkRows(){
-  for(let r=0;r<size;r++){
-    if(grid[r].every(f=>f===target)){
-      score+=100;
-      gems=Math.floor(score/1000);
+// ===============================
+// فحص الصفوف
+// ===============================
+function checkRows() {
+  for (let r = 0; r < size; r++) {
+    if (grid[r].every(f => f === target)) {
+      score += 100;
+      gems = Math.floor(score / 1000);
       newTarget();
     }
   }
-  document.getElementById("score").textContent=score;
-  document.getElementById("gems").textContent=gems;
+
+  updateScore();
 }
 
-// -------------------------------
+function updateScore() {
+  const scoreEl = document.getElementById("score");
+  const gemsEl = document.getElementById("gems");
+
+  if (scoreEl) scoreEl.textContent = score;
+  if (gemsEl) gemsEl.textContent = gems;
+}
+
+// ===============================
 // المستخدمون النشطون (اختياري)
-// -------------------------------
-function trackActive(){
+// ===============================
+function trackActive() {
+  if (typeof firebase === "undefined") return;
+
   const ref = firebase.database().ref("active/test");
   ref.set(true);
   ref.onDisconnect().remove();
-  firebase.database().ref("active").on("value",snap=>{
-    document.getElementById("activeUsers").innerHTML =
-      "🟢 المستخدمون النشطون: "+snap.numChildren()+
-      "<span class='english'>Active Users</span>";
+
+  firebase.database().ref("active").on("value", snap => {
+    const el = document.getElementById("activeUsers");
+    if (el) {
+      el.innerHTML =
+        "🟢 المستخدمون النشطون: " +
+        snap.numChildren() +
+        "<span class='english'>Active Users</span>";
+    }
   });
 }
+
+// إذا أردت تفعيلها احذف التعليق
 // trackActive();
