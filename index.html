@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fruit Merge Game</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h3>🎮 لعبة دمج الفواكه
+<span class="english">Fruit Merge Game</span>
+</h3>
+
+<div id="userStatus">
+👤 زائر
+<span class="english">Guest</span>
+</div>
+
+<button id="googleLogin">
+تسجيل الدخول
+<span class="english">Login with Google</span>
+</button>
+
+<button id="logoutBtn" style="display:none">
+تسجيل الخروج
+<span class="english">Logout</span>
+</button>
+
+<button id="startBtn">
+ابدأ اللعبة
+<span class="english">Start Game</span>
+</button>
+
+<div id="gameContainer" style="display:none">
+
+<div id="topBar">
+<div>⭐ نقاط: <span id="score">0</span><span class="english">Score</span></div>
+<div>🎯 الهدف: <span id="target"></span><span class="english">Target</span></div>
+<div>💎 <span id="gems">0</span> DA<span class="english">Gems (1 Gem = 1 DA)</span></div>
+</div>
+
+<div class="note">املأ الصف أفقيًا حسب الهدف<span class="english">Fill the row horizontally according to the target</span></div>
+<div id="game"></div>
+
+<div id="activeUsers">🟢 المستخدمون النشطون: 0<span class='english'>Active Users</span></div>
+
+<div>
+<input type="number" id="buyAmount" placeholder="عدد الجواهر"><span class="english">Gem Amount</span><br>
+<button id="buyBtn">شراء جوهرة ب 1 DA<span class="english">Buy Gem (1 DA)</span></button>
+</div>
+
+<div>
+<input type="text" id="withdrawAccount" placeholder="رقم حسابك للسحب"><span class="english">Your Account Number</span><br>
+<button id="sendWithdraw">طلب السحب<span class="english">Withdraw</span></button>
+</div>
+
+<div class="note">استغل كل دمج بالذكر والاستغفار في قلبك<span class="english">Remember Allah and seek forgiveness in every merge</span></div>
+
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="main.js"></script>
+
+</body>
+</html>
