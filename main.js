@@ -1,26 +1,6 @@
-// ===============================
-// حماية ذكية للدومين
-// ===============================
-(function () {
-  const host = window.location.hostname;
-
-  const allowed =
-    host.includes("github.io") ||
-    host.includes("web.app") ||
-    host.includes("firebaseapp.com") ||
-    host === "localhost" ||
-    host === "127.0.0.1";
-
-  if (!allowed) {
-    document.body.innerHTML =
-      "<h2 style='text-align:center;margin-top:50px'>🚫 غير مصرح بتشغيل اللعبة هنا</h2>";
-    throw new Error("Blocked");
-  }
-})();
-
-// ===============================
+// -------------------------------
 // Firebase Configuration
-// ===============================
+// -------------------------------
 const firebaseConfig = {
   apiKey: "YOUR_API_KEY",
   authDomain: "fruit-merge-web.firebaseapp.com",
@@ -28,150 +8,127 @@ const firebaseConfig = {
   projectId: "fruit-merge-web",
   storageBucket: "fruit-merge-web.appspot.com",
   messagingSenderId: "YOUR_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  appId: "YOUR_APP_ID",
+  measurementId: "YOUR_MEASUREMENT_ID"
 };
 
-if (typeof firebase !== "undefined") {
-  firebase.initializeApp(firebaseConfig);
-}
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
 
-// ===============================
-// إعدادات اللعبة
-// ===============================
-let grid = [];
-let score = 0;
-let gems = 0;
-let target = "";
-
-const size = 6;
-const fruits = ["🍎","🍌","🍊","🍓","🍐","🍇"];
-
+// -------------------------------
+// Google Login
+// -------------------------------
+const loginBtn = document.getElementById("googleLogin");
+const logoutBtn = document.getElementById("logoutBtn");
 const startBtn = document.getElementById("startBtn");
-const gameContainer = document.getElementById("gameContainer");
+const userStatus = document.getElementById("userStatus");
 
-if (startBtn) {
-  startBtn.onclick = () => {
-    gameContainer.style.display = "block";
-    startBtn.style.display = "none";
-    init();
-    render();
-  };
-}
+auth.onAuthStateChanged(user=>{
+  if(user){
+    userStatus.textContent = `👤 ${user.displayName || "User"}`;
+    loginBtn.style.display="none";
+    logoutBtn.style.display="inline-block";
+    startBtn.style.display="inline-block";
+    loadUserData(user.uid);
+  }else{
+    userStatus.textContent = "👤 زائر";
+    loginBtn.style.display="inline-block";
+    logoutBtn.style.display="none";
+    startBtn.style.display="none";
+  }
+});
 
-// ===============================
-// بدء اللعبة
-// ===============================
-function init() {
-  grid = [];
-  score = 0;
-  gems = 0;
+loginBtn.onclick=()=>{
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider);
+};
 
-  updateScore();
+logoutBtn.onclick=()=>{ auth.signOut(); };
 
-  for (let r = 0; r < size; r++) {
-    let row = [];
-    for (let c = 0; c < size; c++) {
-      row.push(randomFruit());
-    }
+// -------------------------------
+// اللعبة
+// -------------------------------
+let grid=[],score=0,gems=0,target="";
+const size=6;
+const fruits=["🍎","🍌","🍊","🍓","🍐","🍇"];
+
+startBtn.onclick=()=>{
+  document.getElementById("gameContainer").style.display="block";
+  startBtn.style.display="none";
+  init();
+  render();
+};
+
+function init(){
+  grid=[];
+  for(let r=0;r<size;r++){
+    let row=[];
+    for(let c=0;c<size;c++) row.push(randomFruit());
     grid.push(row);
   }
-
   newTarget();
 }
 
-function newTarget() {
-  target = fruits[Math.floor(Math.random() * fruits.length)];
-  const targetEl = document.getElementById("target");
-  if (targetEl) targetEl.textContent = target;
+function newTarget(){
+  target=fruits[Math.floor(Math.random()*fruits.length)];
+  document.getElementById("target").textContent=target;
 }
 
-function randomFruit() {
-  return fruits[Math.floor(Math.random() * fruits.length)];
-}
+function randomFruit(){return fruits[Math.floor(Math.random()*fruits.length)];}
 
-// ===============================
-// رسم الشبكة
-// ===============================
-function render() {
-  const game = document.getElementById("game");
-  if (!game) return;
-
-  game.innerHTML = "";
-
-  for (let r = 0; r < size; r++) {
-    for (let c = 0; c < size; c++) {
-      const cell = document.createElement("div");
-      cell.className = "cell";
-      cell.textContent = grid[r][c];
-      cell.onclick = () => clickCell(r, c);
+function render(){
+  const game=document.getElementById("game");
+  game.innerHTML="";
+  for(let r=0;r<size;r++){
+    for(let c=0;c<size;c++){
+      const cell=document.createElement("div");
+      cell.className="cell";
+      cell.textContent=grid[r][c];
+      cell.onclick=()=>clickCell(r,c);
       game.appendChild(cell);
     }
   }
 }
 
-let selected = null;
-
-function clickCell(r, c) {
-  if (!selected) {
-    selected = [r, c];
-    return;
+let selected=null;
+function clickCell(r,c){
+  if(!selected){selected=[r,c];return;}
+  const [sr,sc]=selected;
+  if(grid[sr][sc]===grid[r][c] && !(sr===r&&sc===c)){
+    grid[sr][sc]=randomFruit();
+    grid[r][c]=randomFruit();
+    checkRows(auth.currentUser.uid);
   }
-
-  const [sr, sc] = selected;
-
-  if (grid[sr][sc] === grid[r][c] && !(sr === r && sc === c)) {
-    grid[sr][sc] = randomFruit();
-    grid[r][c] = randomFruit();
-    checkRows();
-  }
-
-  selected = null;
+  selected=null;
   render();
 }
 
-// ===============================
-// فحص الصفوف
-// ===============================
-function checkRows() {
-  for (let r = 0; r < size; r++) {
-    if (grid[r].every(f => f === target)) {
-      score += 100;
-      gems = Math.floor(score / 1000);
+function checkRows(uid){
+  for(let r=0;r<size;r++){
+    if(grid[r].every(f=>f===target)){
+      score+=100;
+      gems=Math.floor(score/1000);
       newTarget();
+      if(uid){
+        db.ref("users/"+uid).set({score:score,gems:gems});
+      }
     }
   }
-
-  updateScore();
+  document.getElementById("score").textContent=score;
+  document.getElementById("gems").textContent=gems;
 }
 
-function updateScore() {
-  const scoreEl = document.getElementById("score");
-  const gemsEl = document.getElementById("gems");
-
-  if (scoreEl) scoreEl.textContent = score;
-  if (gemsEl) gemsEl.textContent = gems;
-}
-
-// ===============================
-// المستخدمون النشطون (اختياري)
-// ===============================
-function trackActive() {
-  if (typeof firebase === "undefined") return;
-
-  const ref = firebase.database().ref("active/test");
-  ref.set(true);
-  ref.onDisconnect().remove();
-
-  firebase.database().ref("active").on("value", snap => {
-    const el = document.getElementById("activeUsers");
-    if (el) {
-      el.innerHTML =
-        "🟢 المستخدمون النشطون: " +
-        snap.numChildren() +
-        "<span class='english'>Active Users</span>";
+// -------------------------------
+// تحميل بيانات المستخدم من Firebase
+function loadUserData(uid){
+  db.ref("users/"+uid).once("value").then(snap=>{
+    const data = snap.val();
+    if(data){
+      score = data.score || 0;
+      gems = data.gems || 0;
+      document.getElementById("score").textContent=score;
+      document.getElementById("gems").textContent=gems;
     }
   });
 }
-
-// إذا أردت تفعيلها احذف التعليق
-// trackActive();
