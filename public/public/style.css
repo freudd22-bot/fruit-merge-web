@@ -1,8 +1,0 @@
-body{font-family:Tahoma,Arial;background:linear-gradient(135deg,#f5f7fa,#c3cfe2);margin:0;padding:15px;text-align:center}
-button{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;margin:6px}
-#startBtn{background:#4CAF50;color:white}
-.english{display:block;font-size:11px;color:#444}
-#topBar{display:flex;justify-content:space-between;align-items:center;max-width:420px;margin:10px auto;font-weight:bold}
-#game{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;max-width:360px;margin:15px auto}
-.cell{background:white;border-radius:8px;height:50px;display:flex;justify-content:center;align-items:center;font-size:24px;cursor:pointer}
-.note{font-size:13px;margin-top:10px}
