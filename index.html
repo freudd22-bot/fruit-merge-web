@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+<meta charset="UTF-8">
+<title>💎 لعبة دمج الفواكه</title>
+<style>
+body{font-family:Tahoma,Arial;background:linear-gradient(135deg,#f5f7fa,#c3cfe2);margin:0;padding:15px;text-align:center;color:#333}
+.title{font-size:28px;font-weight:bold;background:linear-gradient(90deg,#ff512f,#dd2476);-webkit-background-clip:text;color:transparent;animation:glow 2s infinite alternate}
+@keyframes glow{from{transform:scale(1)}to{transform:scale(1.05)}}
+button{padding:10px 20px;border:none;border-radius:8px;cursor:pointer;margin:6px}
+#startBtn{background:#4CAF50;color:white}
+#buyBtn{background:#FF9800;color:white}
+#sendWithdraw{background:#9C27B0;color:white}
+.english{display:block;font-size:11px;color:#444}
+#topBar{display:flex;justify-content:space-between;align-items:center;max-width:420px;margin:10px auto;font-weight:bold}
+#game{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;max-width:360px;margin:15px auto}
+.cell{background:white;border-radius:8px;height:50px;display:flex;justify-content:center;align-items:center;font-size:24px;cursor:pointer}
+.note{font-size:13px;margin-top:10px}
+input{padding:8px;border-radius:6px;border:1px solid #ccc;width:180px;text-align:center;}
+#leaderboard{max-width:360px;margin:10px auto;background:white;border-radius:8px;padding:8px}
+</style>
+</head>
+<body>
+
+<div class="title">
+🎮 لعبة دمج الفواكه
+<span class="english">Fruit Merge Game</span>
+</div>
+
+<div id="loginBox">
+<input id="usernameInput" placeholder="اسم المستخدم"><span class="english">Username</span><br><br>
+<button id="loginBtn">دخول اللعبة<span class="english">Enter Game</span></button>
+<p id="loginMsg"></p>
+</div>
+
+<div id="userStatus"></div>
+
+<div id="gameContainer" style="display:none">
+
+<div id="topBar">
+<div>⭐ نقاط: <span id="score">0</span><span class="english">Score</span></div>
+<div>🎯 الهدف: <span id="target"></span><span class="english">Target</span></div>
+<div>💎 <span id="gems">0</span> DA<span class="english">Gems</span></div>
+</div>
+
+<button id="startBtn">ابدأ اللعبة<span class="english">Start Game</span></button>
+
+<div class="note">املأ الصف أفقيًا حسب الهدف<span class="english">Fill the row horizontally according to the target</span></div>
+
+<div id="game"></div>
+
+<div class="note">استغل كل دمج بذكر الله في قلبك<span class="english">Remember Allah and seek forgiveness in every merge</span></div>
+
+<div class="note">🏆 أفضل اللاعبين<span class="english">Top Players</span></div>
+<div id="leaderboard"></div>
+
+<div>
+<input type="number" id="buyAmount" placeholder="عدد الجواهر">
+<span class="english">Gem Amount</span><br>
+<button id="buyBtn">شراء جواهر<span class="english">Buy Gems</span></button><br>
+<span>رقم الحساب للدفع: 00799999000887214877</span>
+<div class="note">
+100 جوهرة = 100 DA<br>
+100 جوهرة + 50 جوهرة إضافية
+<span class="english">100 Gems = 100 DA<br>100 Gems + 50 Free</span>
+</div>
+</div>
+
+<div>
+<input type="text" id="withdrawAccount" placeholder="رقم حسابك للسحب"><span class="english">Your Account Number</span><br>
+<button id="sendWithdraw">طلب السحب<span class="english">Withdraw</span></button>
+<div class="note">1000 جوهرة = 1000 DA<span class="english">1000 Gems = 1000 DA</span></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+// Firebase
+const firebaseConfig={
+  apiKey:"AC495068005d5427e9f82ba222d9e3f0a2",
+  databaseURL:"https://fruitmergeweb-c62ed-default-rtdb.firebaseio.com",
+  authDomain:"fruitmergeweb-c62ed.firebaseapp.com",
+  projectId:"fruitmergeweb-c62ed"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+
+let username="", uid="", score=0, gems=0;
+const size=6;
+const fruits=["🍎","🍌","🍊","🍓","🍐","🍇"];
+let grid=[], target="", selected=null, gameRunning=false;
+
+// معرف الجهاز
+const deviceID = localStorage.getItem("fruit_device") || ("device_"+Date.now());
+localStorage.setItem("fruit_device", deviceID);
+
+// استرجاع المستخدم
+window.onload=async()=>{
+    let storedName=localStorage.getItem("fruit_user");
+    let storedUID=localStorage.getItem("fruit_uid");
+    if(storedName && storedUID){
+        username=storedName; uid=storedUID;
+        document.getElementById("loginBox").style.display="none";
+        document.getElementById("gameContainer").style.display="block";
+        let data=await db.ref("users/"+uid).once("value");
+        score=data.val().score; gems=data.val().gems;
+        updateUI(); setActive();
+    }
+    loadLeaderboard();
+}
+
+// تسجيل المستخدم
+document.getElementById("loginBtn").onclick=async()=>{
+    username=document.getElementById("usernameInput").value.trim().toLowerCase();
+    if(username.length<3){alert("اسم المستخدم قصير"); return;}
+
+    // تحقق من الاسم
+    let check=await db.ref("names/"+username).once("value");
+    if(check.exists()){
+        let existingUID = check.val();
+        let existingData = await db.ref("users/"+existingUID).once("value");
+        // منع دخول الاسم من جهاز مختلف
+        if(existingData.val().deviceID && existingData.val().deviceID !== deviceID){
+            alert("⚠️ هذا الاسم مستخدم مسبقًا على جهاز آخر");
+            return;
+        } 
+        uid = existingUID;
+        score = existingData.val().score;
+        gems = existingData.val().gems;
+    } else {
+        // مستخدم جديد، اعطِ الجواهر المجانية
+        uid = "user"+Date.now();
+        await db.ref("names/"+username).set(uid);
+        await db.ref("users/"+uid).set({
+            name: username,
+            score:0,
+            gems:100,
+            deviceID: deviceID // ربط الجهاز باللاعب
+        });
+        score = 0; gems = 100;
+    }
+
+    // حفظ محلي
+    localStorage.setItem("fruit_user", username);
+    localStorage.setItem("fruit_uid", uid);
+
+    startGame();
+}
+
+function startGame(){
+    document.getElementById("loginBox").style.display="none";
+    document.getElementById("gameContainer").style.display="block";
+    updateUI(); setActive();
+}
+
+function setActive(){
+    const activeRef=db.ref("active/"+uid);
+    activeRef.set(true); activeRef.onDisconnect().remove();
+    db.ref("active").on("value",snap=>{
+        document.getElementById("userStatus").innerHTML="👤 "+username+" | 🟢 المستخدمون داخل اللعبة: "+snap.numChildren();
+    });
+}
+
+function updateUI(){
+    document.getElementById("score").textContent=score;
+    document.getElementById("gems").textContent=gems;
+}
+
+document.getElementById("startBtn").onclick=function(){
+    if(!gameRunning){
+        init(); render(); 
+        this.innerHTML="الخروج من اللعبة<span class='english'>Exit Game</span>"; 
+        gameRunning=true;
+    } else {
+        document.getElementById("game").innerHTML="";
+        this.innerHTML="ابدأ اللعبة<span class='english'>Start Game</span>";
+        gameRunning=false;
+
+        // حذف بيانات المستخدم
+        localStorage.removeItem("fruit_user");
+        localStorage.removeItem("fruit_uid");
+
+        // إخفاء اللعبة
+        document.getElementById("gameContainer").style.display="none";
+
+        // إظهار مربع تسجيل الدخول
+        document.getElementById("loginBox").style.display="block";
+    }
+}
+
+function init(){
+    grid=[]; 
+    for(let r=0;r<size;r++){ 
+        let row=[]; 
+        for(let c=0;c<size;c++) row.push(randomFruit()); 
+        grid.push(row);
+    }
+    newTarget();
+}X
+
+
+function newTarget(){ 
+    target=fruits[Math.floor(Math.random()*fruits.length)]; 
+    document.getElementById("target").textContent=target; 
+}
+function randomFruit(){ return fruits[Math.floor(Math.random()*fruits.length)]; }
+
+function render(){
+    const game=document.getElementById("game"); game.innerHTML="";
+    for(let r=0;r<size;r++){ 
+        for(let c=0;c<size;c++){
+            const cell=document.createElement("div");
+            cell.className="cell"; cell.textContent=grid[r][c]; cell.onclick=()=>clickCell(r,c);
+            game.appendChild(cell);
+        }
+    }
+}
+
+function clickCell(r,c){
+    if(!selected){selected=[r,c]; return;}
+    const [sr,sc]=selected;
+    if(grid[sr][sc]===grid[r][c] && !(sr===r && sc===c)){
+        grid[sr][sc]=randomFruit(); grid[r][c]=randomFruit();
+        score+=10; gems--;
+    }
+    selected=null; updateUI(); render();
+    db.ref("users/"+uid).update({score,gems});
+}
+
+// شراء الجواهر
+document.getElementById("buyBtn").onclick=()=>{
+    const amount=parseInt(document.getElementById("buyAmount").value)||0;
+    if(amount<100){alert("الحد الأدنى 100 جوهرة"); return;}
+    const now=new Date().toISOString();
+    db.ref("buyRequests").push({name:username,amount:amount,time:now});
+    alert("✅ تم إرسال طلب الشراء وسيتم مراجعته");
+}
+
+// طلب السحب
+document.getElementById("sendWithdraw").onclick=()=>{
+    if(gems<1000){alert("يجب الوصول إلى 1000 جوهرة"); return;}
+    let acc=document.getElementById("withdrawAccount").value;
+    const now=new Date().toISOString();
+    db.ref("withdrawRequests").push({name:username,amount:gems,account:acc,time:now});
+    alert("✅ تم إرسال طلب السحب");
+}
+
+// أفضل اللاعبين
+function loadLeaderboard(){
+    db.ref("users").orderByChild("score").limitToLast(3).on("value",snap=>{
+        let arr=[]; snap.forEach(d=>arr.push(d.val())); arr.reverse();
+        let html=""; arr.forEach((u,i)=>{ html+=(i+1)+"️⃣ "+u.name+" - "+u.score+"⭐<br>"; });
+        document.getElementById("leaderboard").innerHTML=html;
+    })
+}
+</script>
+</body>
+  </html>
